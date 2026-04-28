@@ -1,7 +1,48 @@
-from datetime import datetime, timezone
-from uuid import uuid4
+from datetime import datetime
 
-from shopping_mart.models.product import Product
+from models import Product, product_from_document
+
+
+class ProductRepository:
+    def __init__(self, collection):
+        self.collection = collection
+
+    def count(self):
+        return self.collection.count_documents({})
+
+    def find_all(self):
+        documents = self.collection.find({}).sort("name", 1)
+        return [product_from_document(document) for document in documents]
+
+    def find_by_sku(self, sku):
+        document = self.collection.find_one({"sku": sku.upper().strip()})
+        return product_from_document(document) if document else None
+
+    def create(self, product):
+        self.collection.insert_one(product.to_document())
+
+    def update(self, sku, changes):
+        self.collection.update_one({"sku": sku.upper().strip()}, {"$set": changes})
+
+    def delete(self, sku):
+        self.collection.delete_one({"sku": sku.upper().strip()})
+
+    def record_sale(self, sku, amount):
+        product = self.find_by_sku(sku)
+        if product is None:
+            raise ValueError("Product not found.")
+        if amount <= 0:
+            raise ValueError("Sale quantity must be greater than zero.")
+        if product.quantity < amount:
+            raise ValueError("Not enough stock available.")
+
+        self.collection.update_one(
+            {"sku": product.sku},
+            {
+                "$inc": {"quantity": -amount, "sold_count": amount},
+                "$set": {"last_sale_at": datetime.now()},
+            },
+        )
 
 
 class InventoryService:
@@ -56,7 +97,6 @@ class InventoryService:
 
     def high_demand_products(self):
         products = []
-        now = datetime.now(timezone.utc)
         for product in self.all_products():
             daily_sales = self.demand_score(product)
             if product.sold_count >= 10 and (daily_sales >= 2 or self.is_low_stock(product)):
@@ -81,8 +121,8 @@ class InventoryService:
         }
 
     def demand_score(self, product):
-        now = datetime.now(timezone.utc)
-        days_live = max((now - self._aware(product.created_at)).days, 1)
+        now = datetime.now()
+        days_live = max((now - product.created_at).days, 1)
         return product.sold_count / days_live
 
     def stock_status(self, product):
@@ -115,11 +155,6 @@ class InventoryService:
         if not values["aisle"] or not values["shelf"]:
             raise ValueError("Aisle and shelf are required.")
 
-    def _aware(self, value):
-        if value.tzinfo is None:
-            return value.replace(tzinfo=timezone.utc)
-        return value
-
     def _product_sku(self, data):
         if data.get("sku"):
             return data["sku"].upper().strip()
@@ -129,4 +164,10 @@ class InventoryService:
         )[:4]
         if not name_part:
             name_part = "ITEM"
-        return f"{name_part}-{uuid4().hex[:6].upper()}"
+
+        number = self.product_repository.count() + 1
+        sku = f"{name_part}-{number:03d}"
+        while self.product_repository.find_by_sku(sku) is not None:
+            number += 1
+            sku = f"{name_part}-{number:03d}"
+        return sku

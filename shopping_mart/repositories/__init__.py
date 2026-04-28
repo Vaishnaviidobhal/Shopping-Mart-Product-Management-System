@@ -1,2 +1,0 @@
-"""MongoDB repository classes."""
-

@@ -1,5 +1,32 @@
-from shopping_mart.models.employee import Employee
-from shopping_mart.utils.security import hash_password
+import hashlib
+
+from models import Employee, employee_from_document
+
+
+def hash_password(password):
+    return hashlib.sha256(password.encode("utf-8")).hexdigest()
+
+
+class EmployeeRepository:
+    def __init__(self, collection):
+        self.collection = collection
+
+    def count(self):
+        return self.collection.count_documents({})
+
+    def find_by_username(self, username):
+        document = self.collection.find_one({"username": username.lower().strip()})
+        return employee_from_document(document) if document else None
+
+    def create(self, employee):
+        self.collection.insert_one(employee.to_document())
+
+    def upsert(self, employee):
+        self.collection.update_one(
+            {"username": employee.username.lower().strip()},
+            {"$set": employee.to_document()},
+            upsert=True,
+        )
 
 
 class AuthService:
@@ -44,6 +71,15 @@ class AuthService:
 
     def has_employees(self):
         return self.employee_repository.count() > 0
+
+    def ensure_default_employee(self):
+        employee = Employee(
+            username=self.PERMANENT_USERNAME,
+            password_hash=hash_password(self.PERMANENT_PASSWORD),
+            full_name=self.PERMANENT_FULL_NAME,
+            role=self.PERMANENT_ROLE,
+        )
+        self.employee_repository.upsert(employee)
 
     def _validate_signup(self, username, password, full_name):
         if not full_name:

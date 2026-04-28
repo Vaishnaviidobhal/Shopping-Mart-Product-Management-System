@@ -2,9 +2,9 @@ from pymongo import MongoClient
 
 
 class MongoDB:
-    def __init__(self, config):
-        self.client = MongoClient(config.mongo_uri, serverSelectionTimeoutMS=3000)
-        self.database = self.client[config.database_name]
+    def __init__(self):
+        self.client = MongoClient("mongodb://localhost:27017", serverSelectionTimeoutMS=3000)
+        self.database = self.client["shopping_mart_db"]
         self.employees = self.database["employees"]
         self.products = self.database["products"]
 

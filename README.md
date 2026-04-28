@@ -11,7 +11,7 @@ A Python Tkinter + MongoDB project for managing shopping mart products, stock le
 - Track quantity, price, category, aisle, shelf, and sold count
 - Record sales, automatically reducing stock
 - Sold-out, low-stock, and high-demand filters
-- Clean folder structure with models, repositories, services, UI, and a single `main.py` entry point
+- Simple folder structure with backend files at the root and UI files in a separate `ui` folder
 
 ## Project Structure
 
@@ -20,15 +20,14 @@ Shoppingmart/
   main.py
   requirements.txt
   README.md
-  shopping_mart/
-    app.py
-    config.py
-    database/
-    models/
-    repositories/
-    services/
-    ui/
-    utils/
+  database.py
+  models.py
+  auth.py
+  inventory.py
+  ui/
+    login_window.py
+    dashboard_window.py
+    styles.py
 ```
 
 ## Setup
@@ -61,13 +60,6 @@ By default, the app uses:
 
 - URI: `mongodb://localhost:27017`
 - Database: `shopping_mart_db`
-
-You can override them with environment variables:
-
-```bash
-set SHOPPING_MART_MONGO_URI=mongodb://localhost:27017
-set SHOPPING_MART_DB=shopping_mart_db
-```
 
 ## High Demand Logic
 

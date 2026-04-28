@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import messagebox
 
-from shopping_mart.ui import styles
+from ui import styles
 
 
 class LoginWindow(tk.Toplevel):

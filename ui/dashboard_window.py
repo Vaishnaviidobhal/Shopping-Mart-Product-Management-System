@@ -3,7 +3,7 @@ from tkinter import messagebox, ttk
 
 from pymongo.errors import DuplicateKeyError
 
-from shopping_mart.ui import styles
+from ui import styles
 
 
 class ProductDialog(tk.Toplevel):
@@ -433,7 +433,7 @@ class DashboardWindow(tk.Toplevel):
                     product.category,
                     product.quantity,
                     f"{product.price:.2f}",
-                    product.location,
+                    product.get_location(),
                     status,
                     product.sold_count,
                 ),
@@ -461,7 +461,7 @@ class DashboardWindow(tk.Toplevel):
             for product in products
             if query in product.name.lower()
             or query in product.category.lower()
-            or query in product.location.lower()
+            or query in product.get_location().lower()
         ]
 
     def _row_tag(self, status):
