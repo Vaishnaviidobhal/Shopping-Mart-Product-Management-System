@@ -6,208 +6,128 @@ from pymongo.errors import DuplicateKeyError
 from ui import styles
 
 
-class ProductDialog(tk.Toplevel):
-    def __init__(self, master, title, on_submit, product=None):
-        super().__init__(master)
-        self.on_submit = on_submit
-        self.product = product
-        self.entries = {}
+PRODUCT_FIELDS = [
+    ("name", "Item Name"),
+    ("category", "Category"),
+    ("quantity", "Quantity"),
+    ("price", "Price"),
+    ("aisle", "Aisle"),
+    ("shelf", "Shelf"),
+]
+STATS = [
+    ("total", "Total Items", styles.PRIMARY),
+    ("low_stock", "Low Stock", styles.WARNING),
+    ("sold_out", "Sold Out", styles.DANGER),
+    ("high_demand", "High Demand", styles.SUCCESS),
+]
+FILTERS = [
+    ("All", "all", styles.PRIMARY),
+    ("Low Stock", "low_stock", styles.WARNING),
+    ("Sold Out", "sold_out", styles.DANGER),
+    ("High Demand", "high_demand", styles.SUCCESS),
+]
+TABLE_COLUMNS = [
+    ("name", "Item", 250),
+    ("category", "Category", 130),
+    ("quantity", "Available", 90),
+    ("price", "Price", 90),
+    ("location", "Location", 150),
+    ("status", "Status", 120),
+    ("sold_count", "Sold", 80),
+]
 
+
+def label(parent, text, **options):
+    options.setdefault("font", styles.FONT)
+    options.setdefault("bg", parent["bg"])
+    return tk.Label(parent, text=text, **options)
+
+
+def button(parent, text, color=None, **options):
+    options.setdefault("font", styles.FONT)
+    if color:
+        options.update(bg=color, fg="white", activebackground=color, activeforeground="white")
+    return tk.Button(parent, text=text, **options)
+
+
+class BaseDialog(tk.Toplevel):
+    def __init__(self, master, title, bg, accent):
+        super().__init__(master)
         self.title(title)
-        self.configure(bg=styles.INPUT_PANEL)
+        self.configure(bg=bg)
         self.resizable(False, False)
         self.transient(master)
         self.grab_set()
+        self.shell = tk.Frame(self, bg=bg, padx=24, pady=20)
+        self.shell.pack(fill="both", expand=True)
+        label(self.shell, title, font=styles.TITLE_FONT, fg=accent).pack(anchor="w")
 
-        self._build(title)
-        self._fill_product()
+
+class ProductDialog(BaseDialog):
+    def __init__(self, master, title, on_submit, product=None):
+        super().__init__(master, title, styles.INPUT_PANEL, styles.ACCENT)
+        self.on_submit = on_submit
+        self.entries = {}
+        self._build_form()
+        self._fill(product)
         self.entries["name"].focus_set()
 
-    def _build(self, title):
-        shell = tk.Frame(self, bg=styles.INPUT_PANEL, padx=24, pady=20)
-        shell.pack(fill="both", expand=True)
-
-        tk.Label(
-            shell,
-            text=title,
-            font=styles.TITLE_FONT,
-            bg=styles.INPUT_PANEL,
-            fg=styles.ACCENT,
-        ).pack(anchor="w")
-
-        fields = [
-            ("name", "Item Name"),
-            ("category", "Category"),
-            ("quantity", "Quantity"),
-            ("price", "Price"),
-            ("aisle", "Aisle"),
-            ("shelf", "Shelf"),
-        ]
-        form = tk.Frame(shell, bg=styles.INPUT_PANEL)
+    def _build_form(self):
+        form = tk.Frame(self.shell, bg=styles.INPUT_PANEL)
         form.pack(fill="x", pady=(14, 10))
-        for key, label in fields:
-            tk.Label(form, text=label, font=styles.FONT, bg=styles.INPUT_PANEL).pack(anchor="w")
-            entry = tk.Entry(form, font=styles.FONT, width=36)
-            entry.pack(fill="x", pady=(3, 9))
-            self.entries[key] = entry
+        for key, text in PRODUCT_FIELDS:
+            label(form, text).pack(anchor="w")
+            self.entries[key] = tk.Entry(form, font=styles.FONT, width=36)
+            self.entries[key].pack(fill="x", pady=(3, 9))
 
-        row = tk.Frame(shell, bg=styles.INPUT_PANEL)
+        row = tk.Frame(self.shell, bg=styles.INPUT_PANEL)
         row.pack(fill="x", pady=(6, 0))
-        tk.Button(
-            row,
-            text="Save",
-            font=styles.FONT,
-            bg=styles.SUCCESS,
-            fg="white",
-            activebackground=styles.SUCCESS,
-            activeforeground="white",
-            command=self._submit,
-        ).pack(side="left", fill="x", expand=True)
-        tk.Button(
-            row,
-            text="Cancel",
-            font=styles.FONT,
-            bg=styles.WARNING,
-            fg="white",
-            activebackground=styles.WARNING,
-            activeforeground="white",
-            command=self.destroy,
-        ).pack(side="left", fill="x", expand=True, padx=(10, 0))
+        button(row, "Save", styles.SUCCESS, command=self._submit).pack(side="left", fill="x", expand=True)
+        button(row, "Cancel", styles.WARNING, command=self.destroy).pack(
+            side="left", fill="x", expand=True, padx=(10, 0)
+        )
 
-    def _fill_product(self):
-        if self.product is None:
+    def _fill(self, product):
+        if not product:
             return
         values = {
-            "name": self.product.name,
-            "category": self.product.category,
-            "quantity": self.product.quantity,
-            "price": f"{self.product.price:.2f}",
-            "aisle": self.product.aisle,
-            "shelf": self.product.shelf,
+            "name": product.name,
+            "category": product.category,
+            "quantity": product.quantity,
+            "price": f"{product.price:.2f}",
+            "aisle": product.aisle,
+            "shelf": product.shelf,
         }
         for key, value in values.items():
             self.entries[key].insert(0, str(value))
 
     def _submit(self):
-        values = {key: entry.get() for key, entry in self.entries.items()}
-        if self.on_submit(values):
+        if self.on_submit({key: entry.get() for key, entry in self.entries.items()}):
             self.destroy()
 
 
-class SaleDialog(tk.Toplevel):
+class SaleDialog(BaseDialog):
     def __init__(self, master, product, on_submit):
-        super().__init__(master)
-        self.product = product
+        super().__init__(master, "Record Sale", styles.OUTPUT_PANEL, styles.TEAL)
         self.on_submit = on_submit
 
-        self.title("Record Sale")
-        self.configure(bg=styles.OUTPUT_PANEL)
-        self.resizable(False, False)
-        self.transient(master)
-        self.grab_set()
-
-        shell = tk.Frame(self, bg=styles.OUTPUT_PANEL, padx=24, pady=20)
-        shell.pack(fill="both", expand=True)
-
-        tk.Label(
-            shell,
-            text="Record Sale",
-            font=styles.TITLE_FONT,
-            bg=styles.OUTPUT_PANEL,
-            fg=styles.TEAL,
-        ).pack(anchor="w")
-        tk.Label(
-            shell,
-            text=f"{product.name} - Available: {product.quantity}",
-            font=styles.FONT,
-            bg=styles.OUTPUT_PANEL,
-            fg=styles.MUTED,
-        ).pack(anchor="w", pady=(4, 14))
-
-        tk.Label(shell, text="Quantity Sold", font=styles.FONT, bg=styles.OUTPUT_PANEL).pack(anchor="w")
-        self.amount_entry = tk.Entry(shell, font=styles.FONT, width=20)
+        label(self.shell, f"{product.name} - Available: {product.quantity}", fg=styles.MUTED).pack(
+            anchor="w", pady=(4, 14)
+        )
+        label(self.shell, "Quantity Sold").pack(anchor="w")
+        self.amount_entry = tk.Entry(self.shell, font=styles.FONT, width=20)
         self.amount_entry.insert(0, "1")
         self.amount_entry.pack(fill="x", pady=(3, 14))
         self.amount_entry.focus_set()
-
-        tk.Button(
-            shell,
-            text="Record",
-            font=styles.FONT,
-            bg=styles.TEAL,
-            fg="white",
-            activebackground=styles.TEAL,
-            activeforeground="white",
-            command=self._submit,
-        ).pack(fill="x")
+        button(self.shell, "Record", styles.TEAL, command=self._submit).pack(fill="x")
 
     def _submit(self):
         if self.on_submit(self.amount_entry.get()):
             self.destroy()
 
 
-class DeleteDialog(tk.Toplevel):
-    def __init__(self, master, product, on_confirm):
-        super().__init__(master)
-        self.on_confirm = on_confirm
-
-        self.title("Delete Item")
-        self.configure(bg=styles.PANEL)
-        self.resizable(False, False)
-        self.transient(master)
-        self.grab_set()
-
-        shell = tk.Frame(self, bg=styles.PANEL, padx=24, pady=20)
-        shell.pack(fill="both", expand=True)
-        tk.Label(
-            shell,
-            text="Delete Item",
-            font=styles.TITLE_FONT,
-            bg=styles.PANEL,
-            fg=styles.DANGER,
-        ).pack(anchor="w")
-        tk.Label(
-            shell,
-            text=f"Remove {product.name} from the mart list?",
-            font=styles.FONT,
-            bg=styles.PANEL,
-            fg=styles.TEXT,
-        ).pack(anchor="w", pady=(8, 18))
-
-        row = tk.Frame(shell, bg=styles.PANEL)
-        row.pack(fill="x")
-        tk.Button(
-            row,
-            text="Delete",
-            font=styles.FONT,
-            bg=styles.DANGER,
-            fg="white",
-            activebackground=styles.DANGER,
-            activeforeground="white",
-            command=self._confirm,
-        ).pack(side="left", fill="x", expand=True)
-        tk.Button(
-            row,
-            text="Cancel",
-            font=styles.FONT,
-            command=self.destroy,
-        ).pack(side="left", fill="x", expand=True, padx=(10, 0))
-
-    def _confirm(self):
-        if self.on_confirm():
-            self.destroy()
-
-
 class DashboardWindow(tk.Toplevel):
-    COLUMNS = (
-        "name",
-        "category",
-        "quantity",
-        "price",
-        "location",
-        "status",
-        "sold_count",
-    )
+    COLUMNS = [column for column, _heading, _width in TABLE_COLUMNS]
 
     def __init__(self, master, employee, inventory_service):
         super().__init__(master)
@@ -229,9 +149,9 @@ class DashboardWindow(tk.Toplevel):
         self.refresh()
 
     def _configure_tree_style(self):
-        style = ttk.Style(self)
-        style.theme_use("clam")
-        style.configure(
+        tree_style = ttk.Style(self)
+        tree_style.theme_use("clam")
+        tree_style.configure(
             "Treeview",
             font=styles.FONT,
             rowheight=30,
@@ -239,53 +159,39 @@ class DashboardWindow(tk.Toplevel):
             fieldbackground="#ffffff",
             foreground=styles.TEXT,
         )
-        style.configure(
+        tree_style.configure(
             "Treeview.Heading",
             font=styles.SUBTITLE_FONT,
             background=styles.PRIMARY,
             foreground="white",
         )
-        style.map("Treeview", background=[("selected", styles.TEAL)])
+        tree_style.map("Treeview", background=[("selected", styles.TEAL)])
 
     def _build(self):
+        self._build_header()
+        self._build_stats()
+        body = tk.Frame(self, bg=styles.OUTPUT_PANEL, padx=18, pady=16)
+        body.pack(fill="both", expand=True, padx=18, pady=14)
+        self._build_actions(body)
+        self._build_filters(body)
+        self._build_table(body)
+
+    def _build_header(self):
         header = tk.Frame(self, bg=styles.BG, padx=18, pady=14)
         header.pack(fill="x")
-
         title_box = tk.Frame(header, bg=styles.BG)
         title_box.pack(side="left")
-        tk.Label(
-            title_box,
-            text="Available Items",
-            font=styles.TITLE_FONT,
-            bg=styles.BG,
-            fg=styles.PURPLE,
-        ).pack(anchor="w")
-        tk.Label(
-            title_box,
-            text="Select an item, then choose what you want to do",
-            font=styles.FONT,
-            bg=styles.BG,
-            fg=styles.MUTED,
-        ).pack(anchor="w")
+        label(title_box, "Available Items", font=styles.TITLE_FONT, fg=styles.PURPLE).pack(anchor="w")
+        label(title_box, "Select an item, then choose what you want to do", fg=styles.MUTED).pack(anchor="w")
+        label(header, f"Signed in as {self.employee.full_name}", fg=styles.MUTED).pack(side="right")
 
-        tk.Label(
-            header,
-            text=f"Signed in as {self.employee.full_name}",
-            font=styles.FONT,
-            bg=styles.BG,
-            fg=styles.MUTED,
-        ).pack(side="right")
-
+    def _build_stats(self):
         stats = tk.Frame(self, bg=styles.BG, padx=18)
         stats.pack(fill="x")
         self.stat_labels = {}
-        for key, title, color in [
-            ("total", "Total Items", styles.PRIMARY),
-            ("low_stock", "Low Stock", styles.WARNING),
-            ("sold_out", "Sold Out", styles.DANGER),
-            ("high_demand", "High Demand", styles.SUCCESS),
-        ]:
-            frame = tk.Frame(
+
+        for key, title, color in STATS:
+            card = tk.Frame(
                 stats,
                 bg=styles.PANEL,
                 padx=14,
@@ -293,115 +199,43 @@ class DashboardWindow(tk.Toplevel):
                 highlightbackground=color,
                 highlightthickness=2,
             )
-            frame.pack(side="left", fill="x", expand=True, padx=(0, 10))
-            tk.Label(frame, text=title, bg=styles.PANEL, fg=styles.MUTED, font=styles.FONT).pack(anchor="w")
-            value = tk.Label(frame, text="0", bg=styles.PANEL, fg=color, font=("Segoe UI", 18, "bold"))
-            value.pack(anchor="w")
-            self.stat_labels[key] = value
+            card.pack(side="left", fill="x", expand=True, padx=(0, 10))
+            label(card, title, fg=styles.MUTED).pack(anchor="w")
+            self.stat_labels[key] = label(card, "0", font=("Segoe UI", 18, "bold"), fg=color)
+            self.stat_labels[key].pack(anchor="w")
 
-        body = tk.Frame(self, bg=styles.OUTPUT_PANEL, padx=18, pady=16)
-        body.pack(fill="both", expand=True, padx=18, pady=14)
+    def _build_actions(self, parent):
+        bar = tk.Frame(parent, bg=styles.OUTPUT_PANEL)
+        bar.pack(fill="x", pady=(0, 12))
+        actions = [
+            ("Add Item", styles.SUCCESS, self.open_add_window),
+            ("Edit Selected", styles.PRIMARY, self.open_edit_window),
+            ("Record Sale", styles.TEAL, self.open_sale_window),
+            ("Delete Selected", styles.DANGER, self.open_delete_window),
+        ]
+        for text, color, command in actions:
+            button(bar, text, color, command=command).pack(side="left", padx=(0, 8))
 
-        action_bar = tk.Frame(body, bg=styles.OUTPUT_PANEL)
-        action_bar.pack(fill="x", pady=(0, 12))
-
-        tk.Button(
-            action_bar,
-            text="Add Item",
-            font=styles.FONT,
-            bg=styles.SUCCESS,
-            fg="white",
-            activebackground=styles.SUCCESS,
-            activeforeground="white",
-            command=self.open_add_window,
-        ).pack(side="left", padx=(0, 8))
-        tk.Button(
-            action_bar,
-            text="Edit Selected",
-            font=styles.FONT,
-            bg=styles.PRIMARY,
-            fg="white",
-            activebackground=styles.PRIMARY,
-            activeforeground="white",
-            command=self.open_edit_window,
-        ).pack(side="left", padx=(0, 8))
-        tk.Button(
-            action_bar,
-            text="Record Sale",
-            font=styles.FONT,
-            bg=styles.TEAL,
-            fg="white",
-            activebackground=styles.TEAL,
-            activeforeground="white",
-            command=self.open_sale_window,
-        ).pack(side="left", padx=(0, 8))
-        tk.Button(
-            action_bar,
-            text="Delete Selected",
-            font=styles.FONT,
-            bg=styles.DANGER,
-            fg="white",
-            activebackground=styles.DANGER,
-            activeforeground="white",
-            command=self.open_delete_window,
-        ).pack(side="left")
-
-        tk.Button(
-            action_bar,
-            text="Refresh",
-            font=styles.FONT,
-            bg=styles.WARNING,
-            fg="white",
-            activebackground=styles.WARNING,
-            activeforeground="white",
-            command=self.refresh,
-        ).pack(side="right")
-        search_entry = tk.Entry(action_bar, textvariable=self.search_text, font=styles.FONT, width=26)
+        button(bar, "Refresh", styles.WARNING, command=self.refresh).pack(side="right")
+        search_entry = tk.Entry(bar, textvariable=self.search_text, font=styles.FONT, width=26)
         search_entry.pack(side="right", padx=(0, 8))
         search_entry.bind("<KeyRelease>", lambda _event: self.refresh())
-        tk.Label(action_bar, text="Search", font=styles.FONT, bg=styles.OUTPUT_PANEL).pack(side="right", padx=(0, 6))
+        label(bar, "Search").pack(side="right", padx=(0, 6))
 
-        filter_bar = tk.Frame(body, bg=styles.OUTPUT_PANEL)
-        filter_bar.pack(fill="x", pady=(0, 12))
-        for label, value, color in [
-            ("All", "all", styles.PRIMARY),
-            ("Low Stock", "low_stock", styles.WARNING),
-            ("Sold Out", "sold_out", styles.DANGER),
-            ("High Demand", "high_demand", styles.SUCCESS),
-        ]:
-            tk.Button(
-                filter_bar,
-                text=label,
-                font=styles.FONT,
-                bg=color,
-                fg="white",
-                activebackground=color,
-                activeforeground="white",
-                command=lambda selected=value: self.set_filter(selected),
-            ).pack(side="left", padx=(0, 8))
+    def _build_filters(self, parent):
+        bar = tk.Frame(parent, bg=styles.OUTPUT_PANEL)
+        bar.pack(fill="x", pady=(0, 12))
+        for text, value, color in FILTERS:
+            button(bar, text, color, command=lambda selected=value: self.set_filter(selected)).pack(
+                side="left", padx=(0, 8)
+            )
 
-        self.tree = ttk.Treeview(body, columns=self.COLUMNS, show="headings", selectmode="browse")
-        headings = {
-            "name": "Item",
-            "category": "Category",
-            "quantity": "Available",
-            "price": "Price",
-            "location": "Location",
-            "status": "Status",
-            "sold_count": "Sold",
-        }
-        widths = {
-            "name": 250,
-            "category": 130,
-            "quantity": 90,
-            "price": 90,
-            "location": 150,
-            "status": 120,
-            "sold_count": 80,
-        }
-        for column in self.COLUMNS:
-            self.tree.heading(column, text=headings[column])
-            self.tree.column(column, width=widths[column], anchor="w")
+    def _build_table(self, parent):
+        self.tree = ttk.Treeview(parent, columns=self.COLUMNS, show="headings", selectmode="browse")
+        for column, heading, width in TABLE_COLUMNS:
+            self.tree.heading(column, text=heading)
+            self.tree.column(column, width=width, anchor="w")
+
         self.tree.pack(fill="both", expand=True)
         self.tree.tag_configure("sold_out", foreground=styles.DANGER)
         self.tree.tag_configure("low_stock", foreground=styles.WARNING)
@@ -414,57 +248,46 @@ class DashboardWindow(tk.Toplevel):
         self.refresh()
 
     def refresh(self):
-        counts = self.inventory_service.dashboard_counts()
-        for key, value in counts.items():
+        for key, value in self.inventory_service.dashboard_counts().items():
             self.stat_labels[key].configure(text=str(value))
 
-        for row in self.tree.get_children():
-            self.tree.delete(row)
-
+        self.tree.delete(*self.tree.get_children())
         for product in self._filtered_products():
             status = self.inventory_service.stock_status(product)
-            tag = self._row_tag(status)
-            self.tree.insert(
-                "",
-                "end",
-                iid=product.sku,
-                values=(
-                    product.name,
-                    product.category,
-                    product.quantity,
-                    f"{product.price:.2f}",
-                    product.get_location(),
-                    status,
-                    product.sold_count,
-                ),
-                tags=(tag,),
-            )
+            self.tree.insert("", "end", iid=product.sku, values=self._row_values(product, status), tags=(self._tag(status),))
 
         if self.selected_sku not in self.tree.get_children():
             self.selected_sku = None
 
     def _filtered_products(self):
-        if self.current_filter == "low_stock":
-            products = self.inventory_service.low_stock_products()
-        elif self.current_filter == "sold_out":
-            products = self.inventory_service.sold_out_products()
-        elif self.current_filter == "high_demand":
-            products = self.inventory_service.high_demand_products()
-        else:
-            products = self.inventory_service.all_products()
-
+        getters = {
+            "all": self.inventory_service.all_products,
+            "low_stock": self.inventory_service.low_stock_products,
+            "sold_out": self.inventory_service.sold_out_products,
+            "high_demand": self.inventory_service.high_demand_products,
+        }
+        products = getters[self.current_filter]()
         query = self.search_text.get().lower().strip()
-        if not query:
-            return products
-        return [
-            product
-            for product in products
-            if query in product.name.lower()
-            or query in product.category.lower()
-            or query in product.get_location().lower()
-        ]
+        return [product for product in products if self._matches(product, query)] if query else products
 
-    def _row_tag(self, status):
+    def _matches(self, product, query):
+        return any(
+            query in value.lower()
+            for value in (product.name, product.category, product.get_location())
+        )
+
+    def _row_values(self, product, status):
+        return (
+            product.name,
+            product.category,
+            product.quantity,
+            f"{product.price:.2f}",
+            product.get_location(),
+            status,
+            product.sold_count,
+        )
+
+    def _tag(self, status):
         return status.lower().replace(" ", "_")
 
     def _load_selected_product(self, _event):
@@ -475,6 +298,7 @@ class DashboardWindow(tk.Toplevel):
         if not self.selected_sku:
             messagebox.showwarning("No item selected", "Select an item from the list first.")
             return None
+
         product = self.inventory_service.product_repository.find_by_sku(self.selected_sku)
         if product is None:
             messagebox.showwarning("Item not found", "That item is no longer available.")
@@ -486,21 +310,18 @@ class DashboardWindow(tk.Toplevel):
 
     def open_edit_window(self):
         product = self._selected_product()
-        if product is None:
-            return
-        ProductDialog(self, "Edit Item", lambda values: self.update_product(product.sku, values), product)
+        if product:
+            ProductDialog(self, "Edit Item", lambda values: self.update_product(product.sku, values), product)
 
     def open_sale_window(self):
         product = self._selected_product()
-        if product is None:
-            return
-        SaleDialog(self, product, lambda amount: self.record_sale(product.sku, amount))
+        if product:
+            SaleDialog(self, product, lambda amount: self.record_sale(product.sku, amount))
 
     def open_delete_window(self):
         product = self._selected_product()
-        if product is None:
-            return
-        DeleteDialog(self, product, lambda: self.delete_product(product.sku))
+        if product and messagebox.askyesno("Delete Item", f"Remove {product.name} from the mart list?"):
+            self.delete_product(product.sku)
 
     def add_product(self, values):
         try:

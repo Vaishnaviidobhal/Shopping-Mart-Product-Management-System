@@ -70,7 +70,7 @@ class LoginWindow(tk.Toplevel):
         ).pack(anchor="w")
         tk.Label(
             panel,
-            text="Use the fixed key created for Navi",
+            text="Use the fixed admin key",
             font=styles.FONT,
             bg=styles.OUTPUT_PANEL,
             fg=styles.MUTED,
@@ -78,7 +78,7 @@ class LoginWindow(tk.Toplevel):
 
         tk.Label(panel, text="Username", font=styles.FONT, bg=styles.OUTPUT_PANEL).pack(anchor="w")
         self.login_username_entry = tk.Entry(panel, font=styles.FONT)
-        self.login_username_entry.insert(0, "Navi")
+        self.login_username_entry.insert(0, "admin")
         self.login_username_entry.pack(fill="x", pady=(4, 14))
 
         tk.Label(panel, text="Password", font=styles.FONT, bg=styles.OUTPUT_PANEL).pack(anchor="w")
@@ -99,7 +99,7 @@ class LoginWindow(tk.Toplevel):
 
         tk.Label(
             panel,
-            text="Username: Navi    Password: 123navi",
+            text="Username: admin    Password: admin123",
             font=("Segoe UI", 9),
             bg=styles.OUTPUT_PANEL,
             fg=styles.MUTED,

@@ -4,7 +4,7 @@ A Python Tkinter + MongoDB project for managing shopping mart products, stock le
 
 ## Features
 
-- Permanent Navi employee login protected with SHA-256 password hashes stored in MongoDB
+- Permanent admin login protected with SHA-256 password hashes stored in MongoDB
 - Full-screen employee access window with a single login panel
 - Colorful dashboard focused on the item list, with separate windows for each action
 - Product CRUD: view available items on the dashboard, then add, edit, sell, or delete through popup windows
@@ -49,8 +49,8 @@ python main.py
 
 The app uses one permanent employee key:
 
-- Username: `Navi`
-- Password: `123navi`
+- Username: `admin`
+- Password: `admin123`
 
 The stored password is not plain text. It is saved as a SHA-256 hash in the `employees` collection.
 

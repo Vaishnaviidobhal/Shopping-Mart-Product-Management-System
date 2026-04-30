@@ -30,10 +30,10 @@ class EmployeeRepository:
 
 
 class AuthService:
-    PERMANENT_USERNAME = "navi"
-    PERMANENT_PASSWORD = "123navi"
-    PERMANENT_FULL_NAME = "Navi"
-    PERMANENT_ROLE = "manager"
+    PERMANENT_USERNAME = "admin"
+    PERMANENT_PASSWORD = "admin123"
+    PERMANENT_FULL_NAME = "Admin"
+    PERMANENT_ROLE = "admin"
 
     def __init__(self, employee_repository):
         self.employee_repository = employee_repository
