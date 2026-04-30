@@ -32,7 +32,7 @@ class LoginWindow(tk.Toplevel):
         ).pack(anchor="w")
         tk.Label(
             shell,
-            text="Permanent employee key only",
+            text="Admin access only",
             font=styles.FONT,
             bg=styles.BG,
             fg=styles.MUTED,

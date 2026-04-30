@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import messagebox
 
-from auth import AuthService, EmployeeRepository
+from auth import AuthService
 from database import MongoDB
 from inventory import InventoryService, ProductRepository
 from ui.dashboard_window import DashboardWindow
@@ -17,14 +17,12 @@ def main():
     root.withdraw()
 
     db = MongoDB()
-    employee_repository = EmployeeRepository(db.employees)
     product_repository = ProductRepository(db.products)
-    auth_service = AuthService(employee_repository)
+    auth_service = AuthService()
     inventory_service = InventoryService(product_repository)
 
     try:
         db.ping()
-        auth_service.ensure_default_employee()
     except Exception as exc:
         messagebox.showerror(
             "MongoDB connection failed",

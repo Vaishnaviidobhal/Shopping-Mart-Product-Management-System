@@ -1,8 +1,6 @@
 import tkinter as tk
 from tkinter import messagebox, ttk
 
-from pymongo.errors import DuplicateKeyError
-
 from ui import styles
 
 
@@ -134,7 +132,7 @@ class DashboardWindow(tk.Toplevel):
         self.employee = employee
         self.inventory_service = inventory_service
         self.current_filter = "all"
-        self.selected_sku = None
+        self.selected_product_id = None
         self.search_text = tk.StringVar()
 
         self.title("Shopping Mart Product Management System")
@@ -254,10 +252,10 @@ class DashboardWindow(tk.Toplevel):
         self.tree.delete(*self.tree.get_children())
         for product in self._filtered_products():
             status = self.inventory_service.stock_status(product)
-            self.tree.insert("", "end", iid=product.sku, values=self._row_values(product, status), tags=(self._tag(status),))
+            self.tree.insert("", "end", iid=product.id, values=self._row_values(product, status), tags=(self._tag(status),))
 
-        if self.selected_sku not in self.tree.get_children():
-            self.selected_sku = None
+        if self.selected_product_id not in self.tree.get_children():
+            self.selected_product_id = None
 
     def _filtered_products(self):
         getters = {
@@ -292,14 +290,14 @@ class DashboardWindow(tk.Toplevel):
 
     def _load_selected_product(self, _event):
         selected = self.tree.selection()
-        self.selected_sku = selected[0] if selected else None
+        self.selected_product_id = selected[0] if selected else None
 
     def _selected_product(self):
-        if not self.selected_sku:
+        if not self.selected_product_id:
             messagebox.showwarning("No item selected", "Select an item from the list first.")
             return None
 
-        product = self.inventory_service.product_repository.find_by_sku(self.selected_sku)
+        product = self.inventory_service.product_repository.find_by_id(self.selected_product_id)
         if product is None:
             messagebox.showwarning("Item not found", "That item is no longer available.")
             self.refresh()
@@ -311,57 +309,55 @@ class DashboardWindow(tk.Toplevel):
     def open_edit_window(self):
         product = self._selected_product()
         if product:
-            ProductDialog(self, "Edit Item", lambda values: self.update_product(product.sku, values), product)
+            ProductDialog(self, "Edit Item", lambda values: self.update_product(product.id, values), product)
 
     def open_sale_window(self):
         product = self._selected_product()
         if product:
-            SaleDialog(self, product, lambda amount: self.record_sale(product.sku, amount))
+            SaleDialog(self, product, lambda amount: self.record_sale(product.id, amount))
 
     def open_delete_window(self):
         product = self._selected_product()
         if product and messagebox.askyesno("Delete Item", f"Remove {product.name} from the mart list?"):
-            self.delete_product(product.sku)
+            self.delete_product(product.id)
 
     def add_product(self, values):
         try:
             self.inventory_service.add_product(values)
             self.refresh()
             return True
-        except DuplicateKeyError:
-            messagebox.showerror("Duplicate item", "This item already exists.")
         except Exception as exc:
             messagebox.showerror("Could not add item", str(exc))
         return False
 
-    def update_product(self, sku, values):
+    def update_product(self, product_id, values):
         try:
-            self.inventory_service.update_product(sku, values)
+            self.inventory_service.update_product(product_id, values)
             self.refresh()
-            self._select_product(sku)
+            self._select_product(product_id)
             return True
         except Exception as exc:
             messagebox.showerror("Could not update item", str(exc))
         return False
 
-    def delete_product(self, sku):
-        self.inventory_service.delete_product(sku)
-        self.selected_sku = None
+    def delete_product(self, product_id):
+        self.inventory_service.delete_product(product_id)
+        self.selected_product_id = None
         self.refresh()
         return True
 
-    def record_sale(self, sku, amount):
+    def record_sale(self, product_id, amount):
         try:
-            self.inventory_service.record_sale(sku, amount)
+            self.inventory_service.record_sale(product_id, amount)
             self.refresh()
-            self._select_product(sku)
+            self._select_product(product_id)
             return True
         except Exception as exc:
             messagebox.showerror("Could not record sale", str(exc))
         return False
 
-    def _select_product(self, sku):
-        if sku in self.tree.get_children():
-            self.tree.selection_set(sku)
-            self.tree.focus(sku)
-            self.selected_sku = sku
+    def _select_product(self, product_id):
+        if product_id in self.tree.get_children():
+            self.tree.selection_set(product_id)
+            self.tree.focus(product_id)
+            self.selected_product_id = product_id

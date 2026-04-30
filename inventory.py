@@ -1,5 +1,7 @@
 from datetime import datetime
 
+from bson import ObjectId
+
 from models import Product, product_from_document
 
 
@@ -7,28 +9,25 @@ class ProductRepository:
     def __init__(self, collection):
         self.collection = collection
 
-    def count(self):
-        return self.collection.count_documents({})
-
     def find_all(self):
         documents = self.collection.find({}).sort("name", 1)
         return [product_from_document(document) for document in documents]
 
-    def find_by_sku(self, sku):
-        document = self.collection.find_one({"sku": sku.upper().strip()})
+    def find_by_id(self, product_id):
+        document = self.collection.find_one({"_id": ObjectId(product_id)})
         return product_from_document(document) if document else None
 
     def create(self, product):
         self.collection.insert_one(product.to_document())
 
-    def update(self, sku, changes):
-        self.collection.update_one({"sku": sku.upper().strip()}, {"$set": changes})
+    def update(self, product_id, changes):
+        self.collection.update_one({"_id": ObjectId(product_id)}, {"$set": changes})
 
-    def delete(self, sku):
-        self.collection.delete_one({"sku": sku.upper().strip()})
+    def delete(self, product_id):
+        self.collection.delete_one({"_id": ObjectId(product_id)})
 
-    def record_sale(self, sku, amount):
-        product = self.find_by_sku(sku)
+    def record_sale(self, product_id, amount):
+        product = self.find_by_id(product_id)
         if product is None:
             raise ValueError("Product not found.")
         if amount <= 0:
@@ -37,7 +36,7 @@ class ProductRepository:
             raise ValueError("Not enough stock available.")
 
         self.collection.update_one(
-            {"sku": product.sku},
+            {"_id": ObjectId(product.id)},
             {
                 "$inc": {"quantity": -amount, "sold_count": amount},
                 "$set": {"last_sale_at": datetime.now()},
@@ -51,7 +50,6 @@ class InventoryService:
 
     def add_product(self, data):
         product = Product(
-            sku=self._product_sku(data),
             name=data["name"].strip(),
             category=data["category"].strip() or "General",
             quantity=int(data["quantity"]),
@@ -63,7 +61,7 @@ class InventoryService:
         self._validate_product(product)
         self.product_repository.create(product)
 
-    def update_product(self, sku, data):
+    def update_product(self, product_id, data):
         changes = {
             "name": data["name"].strip(),
             "category": data["category"].strip() or "General",
@@ -74,13 +72,13 @@ class InventoryService:
             "reorder_level": int(data.get("reorder_level") or 5),
         }
         self._validate_values(changes)
-        self.product_repository.update(sku, changes)
+        self.product_repository.update(product_id, changes)
 
-    def delete_product(self, sku):
-        self.product_repository.delete(sku)
+    def delete_product(self, product_id):
+        self.product_repository.delete(product_id)
 
-    def record_sale(self, sku, amount):
-        self.product_repository.record_sale(sku, int(amount))
+    def record_sale(self, product_id, amount):
+        self.product_repository.record_sale(product_id, int(amount))
 
     def all_products(self):
         return self.product_repository.find_all()
@@ -138,8 +136,6 @@ class InventoryService:
         return 0 < product.quantity <= product.reorder_level
 
     def _validate_product(self, product):
-        if not product.sku:
-            raise ValueError("SKU is required.")
         values = product.to_document()
         self._validate_values(values)
 
@@ -154,20 +150,3 @@ class InventoryService:
             raise ValueError("Reorder level cannot be negative.")
         if not values["aisle"] or not values["shelf"]:
             raise ValueError("Aisle and shelf are required.")
-
-    def _product_sku(self, data):
-        if data.get("sku"):
-            return data["sku"].upper().strip()
-
-        name_part = "".join(
-            character for character in data["name"].upper() if character.isalnum()
-        )[:4]
-        if not name_part:
-            name_part = "ITEM"
-
-        number = self.product_repository.count() + 1
-        sku = f"{name_part}-{number:03d}"
-        while self.product_repository.find_by_sku(sku) is not None:
-            number += 1
-            sku = f"{name_part}-{number:03d}"
-        return sku
